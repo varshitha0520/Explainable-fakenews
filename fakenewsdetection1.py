@@ -1,15 +1,4 @@
 import streamlit as st
-
-st.title("Explainable Fake News Detection")
-
-news_text = st.text_area("Enter a news article")
-
-if st.button("Check News"):
-    if news_text.strip() == "":
-        st.warning("Please enter some news text.")
-    else:
-        st.success("Processing...")
-
 import pandas as pd
 import numpy as np
 import re
@@ -22,16 +11,25 @@ from sklearn.linear_model import LogisticRegression
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
 
-nltk.download('stopwords')
-nltk.download('punkt')
+# -------------------- NLTK SETUP --------------------
+nltk.download("stopwords", quiet=True)
+nltk.download("punkt", quiet=True)
 
-import streamlit as st
+# -------------------- STREAMLIT UI --------------------
+st.set_page_config(page_title="Explainable Fake News Detection")
+st.title("📰 Explainable Fake News Detection System")
+st.write("Enter a news article to check whether it is **Fake or Real**, along with explanation.")
 
-news_text = st.text_area("Enter a news article")
+news_text = st.text_area("✍️ Enter a news article", height=200)
 
+# -------------------- LOAD DATA --------------------
+@st.cache_data
+def load_data():
+    return pd.read_csv("news.csv")
 
-data = pd.read_csv("news.csv")
+data = load_data()
 
+# -------------------- PREPROCESSING --------------------
 stop_words = set(stopwords.words("english"))
 
 def clean_text(text):
@@ -43,34 +41,35 @@ def clean_text(text):
 
 data["clean_text"] = data["text"].apply(clean_text)
 
-data.head()
-
 X = data["clean_text"]
 y = data["label"]
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+# -------------------- MODEL TRAINING --------------------
+@st.cache_resource
+def train_model():
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
-vectorizer = TfidfVectorizer(max_features=5000)
-X_train_vec = vectorizer.fit_transform(X_train)
+    vectorizer = TfidfVectorizer(max_features=5000)
+    X_train_vec = vectorizer.fit_transform(X_train)
 
-model = LogisticRegression()
-model.fit(X_train_vec, y_train)
+    model = LogisticRegression()
+    model.fit(X_train_vec, y_train)
 
-print("✅ Model training completed")
+    return model, vectorizer
 
+model, vectorizer = train_model()
+
+# -------------------- PREDICTION FUNCTION --------------------
 def predict_news(news_text):
     cleaned = clean_text(news_text)
     vector = vectorizer.transform([cleaned])
 
-    # Prediction
     prediction = model.predict(vector)[0]
     probabilities = model.predict_proba(vector)[0]
-
     credibility_score = round(max(probabilities) * 100, 2)
 
-    # Explainable AI
     feature_names = vectorizer.get_feature_names_out()
     coefficients = model.coef_[0]
 
@@ -80,27 +79,30 @@ def predict_news(news_text):
         reverse=True
     )[:5]
 
-    reasons = [word for word, weight in important_words]
+    reasons = [word for word, _ in important_words]
 
-    # Student-friendly summary
-    sentences = sent_tokenize(news_text)
-    summary = " ".join(sentences[:2])
+    summary = " ".join(sent_tokenize(news_text)[:2])
 
-    return {
-        "Prediction": "REAL NEWS ✅" if prediction == 1 else "FAKE NEWS ❌",
-        "Credibility Score": f"{credibility_score}%",
-        "Why is it Fake/Real": f"Important words influencing decision: {', '.join(reasons)}",
-        "Student-Friendly Summary": summary
-    }
+    return prediction, credibility_score, reasons, summary
 
-nltk.download('punkt_tab')
+# -------------------- BUTTON ACTION --------------------
+if st.button("🔍 Check News"):
+    if news_text.strip() == "":
+        st.warning("⚠️ Please enter some news text.")
+    else:
+        prediction, score, reasons, summary = predict_news(news_text)
 
-print("📰 Enter a news article:")
-user_news = input()
+        st.subheader("✅ Result")
+        if prediction == 1:
+            st.success("🟢 REAL NEWS")
+        else:
+            st.error("🔴 FAKE NEWS")
 
-result = predict_news(user_news)
+        st.metric("📊 Credibility Score", f"{score}%")
 
-print("\n🔍 RESULT")
-print("----------------------------")
-for key, value in result.items():
-    print(f"{key}: {value}")
+        st.subheader("🧠 Why this prediction?")
+        st.write("Important words influencing the decision:")
+        st.write(", ".join(reasons))
+
+        st.subheader("📘 Student-Friendly Summary")
+        st.write(summary)
