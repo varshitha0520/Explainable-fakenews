@@ -39,10 +39,14 @@ def clean_text(text):
     words = [w for w in words if w not in stop_words]
     return " ".join(words)
 
-data["clean_text"] = data["text"].apply(clean_text)
+# Automatically detect columns
+text_column = data.columns[0]
+label_column = data.columns[1]
+
+data["clean_text"] = data[text_column].astype(str).apply(clean_text)
 
 X = data["clean_text"]
-y = data["label"]
+y = data[label_column]
 
 # -------------------- MODEL TRAINING --------------------
 @st.cache_resource
