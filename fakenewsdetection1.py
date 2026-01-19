@@ -1,3 +1,15 @@
+import streamlit as st
+
+st.title("Explainable Fake News Detection")
+
+news_text = st.text_area("Enter a news article")
+
+if st.button("Check News"):
+    if news_text.strip() == "":
+        st.warning("Please enter some news text.")
+    else:
+        st.success("Processing...")
+
 import pandas as pd
 import numpy as np
 import re
@@ -13,8 +25,10 @@ from nltk.tokenize import sent_tokenize
 nltk.download('stopwords')
 nltk.download('punkt')
 
-from google.colab import files
-uploaded = files.upload()
+import streamlit as st
+
+news_text = st.text_area("Enter a news article")
+
 
 data = pd.read_csv("news.csv")
 
