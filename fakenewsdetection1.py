@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import re
 import nltk
 
@@ -18,7 +17,10 @@ nltk.download("punkt", quiet=True)
 # -------------------- STREAMLIT UI --------------------
 st.set_page_config(page_title="Explainable Fake News Detection")
 st.title("📰 Explainable Fake News Detection System")
-st.write("Enter a news article to check whether it is **Fake or Real**, along with explanation.")
+st.write(
+    "Enter a news article to check whether it is **Fake or Real**, "
+    "along with an explanation."
+)
 
 news_text = st.text_area("✍️ Enter a news article", height=200)
 
@@ -29,28 +31,32 @@ def load_data():
 
 data = load_data()
 
+# -------------------- DATA VALIDATION --------------------
+if len(data.columns) < 2:
+    st.error("Dataset must contain at least TWO columns: text and label")
+    st.stop()
+
+text_column = data.columns[0]
+label_column = data.columns[1]
+
 # -------------------- PREPROCESSING --------------------
 stop_words = set(stopwords.words("english"))
 
 def clean_text(text):
-    text = text.lower()
+    text = str(text).lower()
     text = re.sub(r"[^a-zA-Z]", " ", text)
     words = text.split()
     words = [w for w in words if w not in stop_words]
     return " ".join(words)
 
-# Automatically detect columns
-text_column = data.columns[0]
-label_column = data.columns[1]
-
-data["clean_text"] = data[text_column].astype(str).apply(clean_text)
+data["clean_text"] = data[text_column].apply(clean_text)
 
 X = data["clean_text"]
 y = data[label_column]
 
 # -------------------- MODEL TRAINING --------------------
 @st.cache_resource
-def train_model():
+def train_model(X, y):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
@@ -58,12 +64,12 @@ def train_model():
     vectorizer = TfidfVectorizer(max_features=5000)
     X_train_vec = vectorizer.fit_transform(X_train)
 
-    model = LogisticRegression()
+    model = LogisticRegression(max_iter=1000)
     model.fit(X_train_vec, y_train)
 
     return model, vectorizer
 
-model, vectorizer = train_model()
+model, vectorizer = train_model(X, y)
 
 # -------------------- PREDICTION FUNCTION --------------------
 def predict_news(news_text):
